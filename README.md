@@ -1,226 +1,252 @@
-# AICoverGen
-An autonomous pipeline to create covers with any RVC v2 trained AI voice from YouTube videos or a local audio file. For developers who may want to add a singing functionality into their AI assistant/chatbot/vtuber, or for people who want to hear their favourite characters sing their favourite song.
+# Audio-Stemmer
 
-Showcase: https://www.youtube.com/watch?v=2qZuE4WM7CM
+Split songs into vocals and instrument stems with state-of-the-art separation models, and convert voices with RVC v2 models.
 
-Setup Guide: https://www.youtube.com/watch?v=pdlhk4vVHQk
+Audio-Stemmer started as a fork of [SociallyIneptWeeb/AICoverGen](https://github.com/SociallyIneptWeeb/AICoverGen). It replaces the original MDX-Net ONNX separation with the [`audio-separator`](https://github.com/nomadkaraoke/python-audio-separator) library (BS-Roformer, Mel-Roformer, MDX23C, VR, Demucs). Its main app is a tools UI for:
 
-![](images/webui_generate.png?raw=true)
+- **Audio Splitter:** split a song into instrumental, main vocals, backup vocals and de-reverbed vocals, and optionally the instrumental into drums, bass, guitar, piano and other.
+- **Voice Conversion:** convert any audio file with an RVC v2 voice model.
+- **Stem Separator:** split an instrumental into individual instrument stems, with an optional stereo split of the guitar.
 
-WebUI is under constant development and testing, but you can try it out right now on both local and colab!
+The full AI cover pipeline from AICoverGen is still included. It runs as a [secondary WebUI](#ai-cover-generation-webui) and a [CLI](#cli).
+
+It runs on NVIDIA GPUs and on macOS (Apple Silicon/CPU).
+
+![Audio Splitter](images/tools_audio_splitter.png?raw=true)
 
 ## Table of Contents
 
-- [Changelog](#changelog)
 - [Setup](#setup)
-    - [Install Git and Python](#install-git-and-python)
-    - [Install ffmpeg and sox](#install-ffmpeg)
-    - [Clone AICoverGen repository](#clone-aicovergen-repository)
-    - [Download required models](#download-required-models)
-- [Usage with WebUI](#usage-with-webui)
-    - [Download RVC models via WebUI](#download-rvc-models-via-webui)
-    - [Upload RVC models via WebUI](#upload-rvc-models-via-webui)
-    - [Running the pipeline via WebUI](#running-the-pipeline-via-webui)
-- [Usage with CLI](#usage-with-cli)
-    - [Manual Download of RVC models](#manual-download-of-rvc-models)
-    - [Running the pipeline via CLI](#running-the-pipeline-via-cli)
+- [Tools app](#tools-app)
+    - [Audio Splitter](#audio-splitter)
+    - [Voice Conversion](#voice-conversion)
+    - [Stem Separator](#stem-separator)
+- [Separation models](#separation-models)
+- [AI cover generation WebUI](#ai-cover-generation-webui)
+- [CLI](#cli)
+- [Output files and caching](#output-files-and-caching)
+- [Troubleshooting](#troubleshooting)
 - [Terms of Use](#terms-of-use)
-
-
-## Changelog
-
-- WebUI for easier conversions and downloading of voice models
-- Support for cover generations from a local audio file
-- Option to keep intermediate files generated. e.g. Isolated vocals/instrumentals
-- Download suggested public voice models from table with search/tag filters
-- Support for Pixeldrain download links for voice models
-- Implement new rmvpe pitch extraction technique for faster and higher quality vocal conversions
-- Volume control for AI main vocals, backup vocals and instrumentals
-- Index Rate for Voice conversion
-- Reverb Control for AI main vocals
-- Local network sharing option for webui
-- Extra RVC options - filter_radius, rms_mix_rate, protect
-- Local file upload via file browser option
-- Upload of locally trained RVC v2 models via WebUI
-- Pitch detection method control, e.g. rmvpe/mangio-crepe
-- Pitch change for vocals and instrumentals together. Same effect as changing key of song in Karaoke.
-- Audio output format option: wav or mp3.
-
-## Update AICoverGen to latest version
-
-Install and pull any new requirements and changes by opening a command line window in the `AICoverGen` directory and running the following commands.
-
-```
-pip install -r requirements.txt
-git pull
-```
-
-For colab users, simply click `Runtime` in the top navigation bar of the colab notebook and `Disconnect and delete runtime` in the dropdown menu. 
-Then follow the instructions in the notebook to run the webui.
-
-## Colab notebook
-
-For those without a powerful enough NVIDIA GPU, you may try AICoverGen out using Google Colab.
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SociallyIneptWeeb/AICoverGen/blob/main/AICoverGen_colab.ipynb)
-
-For those who face issues with Google Colab notebook disconnecting after a few minutes, here's an alternative that doesn't use the WebUI.
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ardha27/AICoverGen-NoUI-Colab/blob/main/CoverGen_No_UI.ipynb)
-
-For those who want to run this locally, follow the setup guide below.
 
 ## Setup
 
-### Install Git and Python
+### Requirements
 
-Follow the instructions [here](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) to install Git on your computer. Also follow this [guide](https://realpython.com/installing-python/) to install Python **VERSION 3.9** if you haven't already. Using other versions of Python may result in dependency conflicts.
+- **Python 3.9.** Newer versions break the pinned `fairseq==0.12.2` and `gradio==3.39.0`.
+- **ffmpeg** and **sox** on your `PATH`.
+  - macOS: `brew install ffmpeg sox`
+  - Linux: `sudo apt install ffmpeg sox`
+  - Windows: install [ffmpeg](https://www.gyan.dev/ffmpeg/builds/) and [sox](https://sourceforge.net/projects/sox/) and add both to your `PATH`.
 
-### Install ffmpeg
+### Install
 
-Follow the instructions [here](https://www.hostinger.com/tutorials/how-to-install-ffmpeg) to install ffmpeg on your computer.
-
-### Install sox
-
-Follow the instructions [here](https://www.tutorialexample.com/a-step-guide-to-install-sox-sound-exchange-on-windows-10-python-tutorial/) to install sox and add it to your Windows path environment.
-
-### Clone AICoverGen repository
-
-Open a command line window and run these commands to clone this entire repository and install the additional dependencies required.
-
+```bash
+git clone https://github.com/adityaparikh7/Audio-Stemmer
 ```
-git clone https://github.com/SociallyIneptWeeb/AICoverGen
-cd AICoverGen
+
+```bash
+cd Audio-Stemmer
+```
+
+NVIDIA GPU (CUDA):
+
+```bash
 pip install -r requirements.txt
+```
+
+macOS or CPU only:
+
+```bash
+pip install -r requirements_mac.txt
 ```
 
 ### Download required models
 
-Run the following command to download the required MDXNET vocal separation models and hubert base model.
+This downloads `hubert_base.pt` and `rmvpe.pt` into `rvc_models/` (needed for voice conversion), plus the legacy MDX-Net models into `mdxnet_models/`. Separation models download on first use.
 
-```
+```bash
 python src/download_models.py
 ```
 
+### Add voice models
 
-## Usage with WebUI
-
-To run the AICoverGen WebUI, run the following command.
+Voice models are only needed for voice conversion and cover generation. Put each voice in its own folder in `rvc_models/`, with one `.pth` file and an optional `.index` file:
 
 ```
+rvc_models
+├── John
+│   ├── JohnV2.pth
+│   └── added_IVF2237_Flat_nprobe_1_v2.index
+├── May
+│   └── May.pth
+├── hubert_base.pt
+└── rmvpe.pt
+```
+
+Only RVC **v2** checkpoints are supported. You can also download or upload models from the [AI cover WebUI](#ai-cover-generation-webui).
+
+## Tools app
+
+```bash
+python src/tools.py
+```
+
+When you see `Running on local URL: http://127.0.0.1:7860`, open that link. Results are saved in `song_output/`.
+
+### Audio Splitter
+
+![Audio Splitter](images/tools_audio_splitter.png?raw=true)
+
+Upload a song and click **Split Audio**. You get four outputs:
+
+- **Instrumental**
+- **Backup Vocals**
+- **Main Vocals**
+- **Main Vocals (De-Reverbed)**
+
+Under **Separation Model Selection**, you can pick the model for each step: vocal/instrumental, main/backup vocals and de-reverb. Set the de-reverb model to "None (Skip)" to skip that step.
+
+Open **Instrumental Stem Separation** and tick **Enable Instrumental Stem Separation** to also split the instrumental into drums, bass, guitar, piano and other. This adds a lot of processing time.
+
+Outputs go to `song_output/<file name>_audio_split/`.
+
+### Voice Conversion
+
+![Voice Conversion](images/tools_voice_conversion.png?raw=true)
+
+This tab converts any audio file with an RVC voice model, with no splitting. It works best on a clean, dry vocal, such as the **Main Vocals (De-Reverbed)** output from the Audio Splitter.
+
+- **Voice Model:** a folder in `rvc_models/`. Click 🔄 after adding new ones.
+- **Pitch Change (Octaves):** use `1` for male→female and `-1` for female→male.
+- **Index Rate:** how much of the voice model's accent to keep.
+- **Filter Radius:** if 3 or more, applies median filtering to the pitch, which can reduce breathiness.
+- **RMS Mix Rate:** use the original vocal's loudness (0) or a fixed loudness (1).
+- **Protect Rate:** protects breaths and voiceless consonants. `0.5` turns it off.
+- **Pitch Detection:** `rmvpe` gives clearer vocals; `mangio-crepe` gives smoother ones and adds a **Crepe Hop Length** setting.
+
+The converted file is saved as `song_output/<file name>_to_<voice>_p<pitch>.wav`.
+
+### Stem Separator
+
+![Stem Separator](images/tools_stem_separator.png?raw=true)
+
+Upload an instrumental (for example, the Audio Splitter's **Instrumental** output) and click **Separate Stems**. You get drums, bass, guitar, piano, other and vocal remnants. Which stems you get depends on the model.
+
+**Split guitar by stereo position** also splits the guitar stem into **Guitar (Center)** and **Guitar (Sides)**. This is DSP panning, not a model, so it separates guitars by where they sit in the stereo field. It is not a true lead/rhythm split. The **Guitar Split** box reports how much of the guitar ended up in the sides. Songs with mostly centered guitars won't split usefully. This option needs a 6-stem model.
+
+Outputs go to `song_output/<file name>_stems_only/`.
+
+## Separation models
+
+Models are downloaded automatically into `separation_models/` the first time you use them. The first entry in each list is the default.
+
+| Step | Models |
+|------|--------|
+| Vocals / Instrumental | **BS-Roformer (Best Quality)**, MDX23C HQ v2, MDX23C HQ, UVR-MDX-NET Voc FT (Legacy) |
+| Main / Backup vocals | **Mel-Roformer Karaoke (Best)**, UVR MDX Karaoke 2 (Legacy) |
+| De-Reverb | **UVR DeEcho-DeReverb (Best)**, Reverb HQ By FoxJoy (Legacy), None (Skip) |
+| Instrumental stems | **HTDemucs 6-Stem (Best)**, BS-Roformer SW 6-Stem (Best Guitar), HTDemucs Fine-Tuned 4-Stem, HTDemucs Standard 4-Stem (Fast) |
+
+6-stem models output drums, bass, guitar, piano and other. 4-stem models output drums, bass and other; guitar and piano end up in "other". BS-Roformer SW gives the cleanest guitar stem.
+
+## AI cover generation WebUI
+
+The original AICoverGen pipeline makes a full cover in one step:
+
+1. Download the song from YouTube, or use a local file.
+2. Split vocals from the instrumental.
+3. Split main vocals from backup vocals.
+4. De-reverb the main vocals.
+5. Optionally split the instrumental into stems.
+6. Convert the main vocals with RVC.
+7. Add effects and remix.
+
+```bash
 python src/webui.py
 ```
 
-| Flag                                       | Description |
-|--------------------------------------------|-------------|
-| `-h`, `--help`                             | Show this help message and exit. |
-| `--share`                                  | Create a public URL. This is useful for running the web UI on Google Colab. |
-| `--listen`                                 | Make the web UI reachable from your local network. |
-| `--listen-host LISTEN_HOST`                | The hostname that the server will use. |
-| `--listen-port LISTEN_PORT`                | The listening port that the server will use. |
+| Flag | Description |
+|------|-------------|
+| `--share` | Create a public Gradio URL. |
+| `--listen` | Make the WebUI reachable on your local network. |
+| `--listen-host HOST` | Hostname for the server. |
+| `--listen-port PORT` | Port for the server. |
 
-Once the following output message `Running on local URL:  http://127.0.0.1:7860` appears, you can click on the link to open a tab with the WebUI.
+- **Generate:** choose a voice and paste a YouTube link or local path, or upload a file.
+  - **Pitch Change** shifts only the AI vocals, in octaves. **Overall Pitch Change** shifts the whole song's key, in semitones.
+  - The accordions hold the separation model choices (including stems), the RVC options, and the mixing options: volume for each part and each stem, reverb, and output format.
+- **Download model:** download a voice model from a HuggingFace or Pixeldrain zip link, or browse the public model index by tag or search term.
+- **Upload model:** upload a zip of a locally trained RVC v2 model.
 
-### Download RVC models via WebUI
+## CLI
 
-![](images/webui_dl_model.png?raw=true)
+The CLI runs the cover pipeline without a UI.
 
-Navigate to the `Download model` tab, and paste the download link to the RVC model and give it a unique name.
-You may search the [AI Hub Discord](https://discord.gg/aihub) where already trained voice models are available for download. You may refer to the examples for how the download link should look like.
-The downloaded zip file should contain the .pth model file and an optional .index file.
-
-Once the 2 input fields are filled in, simply click `Download`! Once the output message says `[NAME] Model successfully downloaded!`, you should be able to use it in the `Generate` tab after clicking the refresh models button!
-
-### Upload RVC models via WebUI
-
-![](images/webui_upload_model.png?raw=true)
-
-For people who have trained RVC v2 models locally and would like to use them for AI Cover generations.
-Navigate to the `Upload model` tab, and follow the instructions.
-Once the output message says `[NAME] Model successfully uploaded!`, you should be able to use it in the `Generate` tab after clicking the refresh models button!
-
-
-### Running the pipeline via WebUI
-
-![](images/webui_generate.png?raw=true)
-
-- From the Voice Models dropdown menu, select the voice model to use. Click `Update` if you added the files manually to the [rvc_models](rvc_models) directory to refresh the list.
-- In the song input field, copy and paste the link to any song on YouTube or the full path to a local audio file.
-- Pitch should be set to either -12, 0, or 12 depending on the original vocals and the RVC AI modal. This ensures the voice is not *out of tune*.
-- Other advanced options for Voice conversion and audio mixing can be viewed by clicking the accordion arrow to expand.
-
-Once all Main Options are filled in, click `Generate` and the AI generated cover should appear in a less than a few minutes depending on your GPU.
-
-## Usage with CLI
-
-### Manual Download of RVC models
-
-Unzip (if needed) and transfer the `.pth` and `.index` files to a new folder in the [rvc_models](rvc_models) directory. Each folder should only contain one `.pth` and one `.index` file.
-
-The directory structure should look something like this:
-```
-├── rvc_models
-│   ├── John
-│   │   ├── JohnV2.pth
-│   │   └── added_IVF2237_Flat_nprobe_1_v2.index
-│   ├── May
-│   │   ├── May.pth
-│   │   └── added_IVF2237_Flat_nprobe_1_v2.index
-│   ├── MODELS.txt
-│   └── hubert_base.pt
-├── mdxnet_models
-├── song_output
-└── src
- ```
-
-### Running the pipeline via CLI
-
-To run the AI cover generation pipeline using the command line, run the following command.
-
-```
-python src/main.py [-h] -i SONG_INPUT -dir RVC_DIRNAME -p PITCH_CHANGE [-k | --keep-files | --no-keep-files] [-ir INDEX_RATE] [-fr FILTER_RADIUS] [-rms RMS_MIX_RATE] [-palgo PITCH_DETECTION_ALGO] [-hop CREPE_HOP_LENGTH] [-pro PROTECT] [-mv MAIN_VOL] [-bv BACKUP_VOL] [-iv INST_VOL] [-pall PITCH_CHANGE_ALL] [-rsize REVERB_SIZE] [-rwet REVERB_WETNESS] [-rdry REVERB_DRYNESS] [-rdamp REVERB_DAMPING] [-oformat OUTPUT_FORMAT]
+```bash
+python src/main.py -i SONG_INPUT -dir RVC_DIRNAME -p PITCH_CHANGE [options]
 ```
 
-| Flag                                       | Description |
-|--------------------------------------------|-------------|
-| `-h`, `--help`                             | Show this help message and exit. |
-| `-i SONG_INPUT`                            | Link to a song on YouTube or path to a local audio file. Should be enclosed in double quotes for Windows and single quotes for Unix-like systems. |
-| `-dir MODEL_DIR_NAME`                      | Name of folder in [rvc_models](rvc_models) directory containing your `.pth` and `.index` files for a specific voice. |
-| `-p PITCH_CHANGE`                          | Change pitch of AI vocals in octaves. Set to 0 for no change. Generally, use 1 for male to female conversions and -1 for vice-versa. |
-| `-k`                                       | Optional. Can be added to keep all intermediate audio files generated. e.g. Isolated AI vocals/instrumentals. Leave out to save space. |
-| `-ir INDEX_RATE`                           | Optional. Default 0.5. Control how much of the AI's accent to leave in the vocals. 0 <= INDEX_RATE <= 1. |
-| `-fr FILTER_RADIUS`                        | Optional. Default 3. If >=3: apply median filtering median filtering to the harvested pitch results. 0 <= FILTER_RADIUS <= 7. |
-| `-rms RMS_MIX_RATE`                        | Optional. Default 0.25. Control how much to use the original vocal's loudness (0) or a fixed loudness (1). 0 <= RMS_MIX_RATE <= 1. |
-| `-palgo PITCH_DETECTION_ALGO`              | Optional. Default rmvpe. Best option is rmvpe (clarity in vocals), then mangio-crepe (smoother vocals). |
-| `-hop CREPE_HOP_LENGTH`                    | Optional. Default 128. Controls how often it checks for pitch changes in milliseconds when using mangio-crepe algo specifically. Lower values leads to longer conversions and higher risk of voice cracks, but better pitch accuracy. |
-| `-pro PROTECT`                             | Optional. Default 0.33. Control how much of the original vocals' breath and voiceless consonants to leave in the AI vocals. Set 0.5 to disable. 0 <= PROTECT <= 0.5. |
-| `-mv MAIN_VOCALS_VOLUME_CHANGE`            | Optional. Default 0. Control volume of main AI vocals. Use -3 to decrease the volume by 3 decibels, or 3 to increase the volume by 3 decibels. |
-| `-bv BACKUP_VOCALS_VOLUME_CHANGE`          | Optional. Default 0. Control volume of backup AI vocals. |
-| `-iv INSTRUMENTAL_VOLUME_CHANGE`           | Optional. Default 0. Control volume of the background music/instrumentals. |
-| `-pall PITCH_CHANGE_ALL`                   | Optional. Default 0. Change pitch/key of background music, backup vocals and AI vocals in semitones. Reduces sound quality slightly. |
-| `-rsize REVERB_SIZE`                       | Optional. Default 0.15. The larger the room, the longer the reverb time. 0 <= REVERB_SIZE <= 1. |
-| `-rwet REVERB_WETNESS`                     | Optional. Default 0.2. Level of AI vocals with reverb. 0 <= REVERB_WETNESS <= 1. |
-| `-rdry REVERB_DRYNESS`                     | Optional. Default 0.8. Level of AI vocals without reverb. 0 <= REVERB_DRYNESS <= 1. |
-| `-rdamp REVERB_DAMPING`                    | Optional. Default 0.7. Absorption of high frequencies in the reverb. 0 <= REVERB_DAMPING <= 1. |
-| `-oformat OUTPUT_FORMAT`                   | Optional. Default mp3. wav for best quality and large file size, mp3 for decent quality and small file size. |
+Example with stems:
 
+```bash
+python src/main.py -i "https://www.youtube.com/watch?v=XXXXXXXXXXX" -dir John -p 0 --enable-stems --stem-model "BS-Roformer SW 6-Stem (Best Guitar)" --guitar-vol 3
+```
+
+| Flag | Description |
+|------|-------------|
+| `-i`, `--song-input` | YouTube link or path to a local audio file. Quote it. |
+| `-dir`, `--rvc-dirname` | Name of the voice folder in `rvc_models/`. |
+| `-p`, `--pitch-change` | Pitch change for AI vocals only, in **octaves**. |
+| `-k`, `--keep-files` | Keep intermediate files (isolated vocals, instrumentals, etc.). |
+| `-ir`, `--index-rate` | Default `0.5`. How much of the voice model's accent to keep (0–1). |
+| `-fr`, `--filter-radius` | Default `3`. Median filtering of the pitch (0–7). |
+| `-rms`, `--rms-mix-rate` | Default `0.25`. Original loudness (0) vs. fixed loudness (1). |
+| `-palgo`, `--pitch-detection-algo` | Default `rmvpe`. `rmvpe` or `mangio-crepe`. |
+| `-hop`, `--crepe-hop-length` | Default `128`. Pitch check interval for mangio-crepe. |
+| `-pro`, `--protect` | Default `0.33`. Protects breaths and consonants (0–0.5; `0.5` disables). |
+| `-mv`, `--main-vol` | Default `0`. Main AI vocals volume change in dB. |
+| `-bv`, `--backup-vol` | Default `0`. Backup vocals volume change in dB. |
+| `-iv`, `--inst-vol` | Default `0`. Instrumental volume change in dB (when stems are off). |
+| `-pall`, `--pitch-change-all` | Default `0`. Key change for the whole song, in **semitones**. |
+| `-rsize`, `--reverb-size` | Default `0.15`. Reverb room size (0–1). |
+| `-rwet`, `--reverb-wetness` | Default `0.2`. Reverb wet level (0–1). |
+| `-rdry`, `--reverb-dryness` | Default `0.8`. Reverb dry level (0–1). |
+| `-rdamp`, `--reverb-damping` | Default `0.7`. High-frequency absorption of the reverb (0–1). |
+| `-oformat`, `--output-format` | Default `mp3`. `mp3` or `wav`. |
+| `--enable-stems` | Split the instrumental into stems and mix them individually. |
+| `--stem-model` | Stem model display name. Default `HTDemucs 6-Stem (Best)`. |
+| `--drums-vol`, `--bass-vol`, `--guitar-vol`, `--piano-vol`, `--other-inst-vol` | Default `0`. Per-stem volume change in dB (with `--enable-stems`). |
+
+The CLI always uses the default vocal, karaoke and de-reverb models.
+
+## Output files and caching
+
+The cover pipeline (WebUI and CLI) gives each song its own folder: `song_output/<id>/`. The id is the YouTube video ID, or a short hash of the local file.
+
+On reruns, the pipeline reuses cached stems. It redoes separation only when a model changes, and `separation.json` records which models produced the cache. Changing only the stem model reruns only stem separation. Changing only the RVC settings reruns only voice conversion. Unless you keep intermediate files, they are deleted at the end.
+
+## Troubleshooting
+
+- **Segfault (exit 139) on macOS during RVC.** `tools.py`, `main.py` and `webui.py` set `OMP_NUM_THREADS=1` and `PYTORCH_ENABLE_MPS_FALLBACK=1` for you. If you import the modules from your own script, set both before importing torch.
+- **Slow voice conversion on Apple Silicon.** RVC runs on CPU in fp32 on macOS, because HuBERT gives garbage output on MPS and with CPU fp16. Only crepe pitch detection uses MPS.
+- **Dependency errors.** Make sure you are on Python 3.9.
+- **The first run of a model is slow.** Separation models are downloaded the first time each one is used.
 
 ## Terms of Use
 
 The use of the converted voice for the following purposes is prohibited.
 
 * Criticizing or attacking individuals.
-
 * Advocating for or opposing specific political positions, religions, or ideologies.
-
 * Publicly displaying strongly stimulating expressions without proper zoning.
-
 * Selling of voice models and generated voice clips.
-
 * Impersonation of the original owner of the voice with malicious intentions to harm/hurt others.
-
 * Fraudulent purposes that lead to identity theft or fraudulent phone calls.
 
 ## Disclaimer
 
 I am not liable for any direct, indirect, consequential, incidental, or special damages arising out of or in any way connected with the use/misuse or inability to use this software.
+
+## Credits
+
+Based on [AICoverGen](https://github.com/SociallyIneptWeeb/AICoverGen) by SociallyIneptWeeb. Separation is done by [python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator), and voice conversion by [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI).
