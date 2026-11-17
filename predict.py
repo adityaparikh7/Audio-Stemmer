@@ -265,7 +265,7 @@ class Predictor(BasePredictor):
             reverb_dryness=reverb_dryness,
             reverb_damping=reverb_damping,
             output_format=output_format,
-            stem_model='HTDemucs 6-Stem (Best)' if enable_stem_separation else None,
+            stem_model=m.DEFAULT_STEM_MODEL if enable_stem_separation else None,
             drums_vol=drums_volume_change,
             bass_vol=bass_volume_change,
             guitar_vol=guitar_volume_change,

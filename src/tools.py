@@ -20,11 +20,13 @@ import torch
 
 from rvc import Config, load_hubert, get_vc, rvc_infer
 from separator_models import (
-    VOCAL_INSTRUMENTAL_MODELS,
+    VOCAL_MODELS,
+    INSTRUMENTAL_MODELS,
     KARAOKE_MODELS,
     DEREVERB_MODELS,
     INSTRUMENTAL_STEM_MODELS,
     DEFAULT_VOCAL_MODEL,
+    DEFAULT_INSTRUMENTAL_MODEL,
     DEFAULT_KARAOKE_MODEL,
     DEFAULT_DEREVERB_MODEL,
     DEFAULT_STEM_MODEL,
@@ -43,7 +45,7 @@ output_dir = os.path.join(BASE_DIR, 'song_output')
 # Audio Splitter helpers
 # ---------------------------------------------------------------------------
 
-def split_audio_webui(input_audio, vocal_model, karaoke_model, dereverb_model,
+def split_audio_webui(input_audio, vocal_model, instrumental_model, karaoke_model, dereverb_model,
                       enable_stems, stem_model):
     """Split audio into instrumental, backup vocals, main vocals, and de-reverbed main vocals.
     Optionally split instrumental into individual stems."""
@@ -61,7 +63,8 @@ def split_audio_webui(input_audio, vocal_model, karaoke_model, dereverb_model,
 
     # Step 1: Vocals / Instrumental separation
     vocals_path, instrumentals_path = separate_vocals_instrumental(
-        input_path, out_folder, model_display_name=vocal_model, base_name=base_name
+        input_path, out_folder, model_display_name=vocal_model, base_name=base_name,
+        instrumental_model_display_name=instrumental_model
     )
 
     # Step 2: Main / Backup vocals split
@@ -235,11 +238,18 @@ with gr.Blocks(title='AI Audio Tools') as app:
             )
             with gr.Row():
                 vocal_model_dropdown = gr.Dropdown(
-                    choices=list(VOCAL_INSTRUMENTAL_MODELS.keys()),
+                    choices=list(VOCAL_MODELS.keys()),
                     value=DEFAULT_VOCAL_MODEL,
-                    label='Vocal / Instrumental Model',
-                    info='Separates vocals from instrumentals. BS-Roformer is state-of-the-art.'
+                    label='Vocal Model',
+                    info='The vocals come from this model. An ensemble runs several models and combines them.'
                 )
+                instrumental_model_dropdown = gr.Dropdown(
+                    choices=list(INSTRUMENTAL_MODELS.keys()),
+                    value=DEFAULT_INSTRUMENTAL_MODEL,
+                    label='Instrumental Model',
+                    info='The instrumental comes from this model.'
+                )
+            with gr.Row():
                 karaoke_model_dropdown = gr.Dropdown(
                     choices=list(KARAOKE_MODELS.keys()),
                     value=DEFAULT_KARAOKE_MODEL,
@@ -256,7 +266,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
         with gr.Accordion("Instrumental Stem Separation", open=False):
             gr.Markdown(
                 'Optionally split the instrumental into individual stems: drums, bass, guitar, piano, and other. '
-                'Uses Meta\'s HTDemucs model. Adds significant processing time.'
+                'Adds significant processing time.'
             )
             with gr.Row():
                 enable_stems_cb = gr.Checkbox(
@@ -268,7 +278,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
                     choices=list(INSTRUMENTAL_STEM_MODELS.keys()),
                     value=DEFAULT_STEM_MODEL,
                     label='Stem Separation Model',
-                    info='HTDemucs 6-Stem separates guitar and piano. 4-Stem models are faster.',
+                    info='6-Stem models separate guitar and piano. 4-Stem models are faster.',
                     visible=False,
                 )
 
@@ -295,8 +305,8 @@ with gr.Blocks(title='AI Audio Tools') as app:
 
         split_btn.click(
             split_audio_webui,
-            inputs=[audio_in, vocal_model_dropdown, karaoke_model_dropdown, dereverb_model_dropdown,
-                    enable_stems_cb, stem_model_dropdown],
+            inputs=[audio_in, vocal_model_dropdown, instrumental_model_dropdown, karaoke_model_dropdown,
+                    dereverb_model_dropdown, enable_stems_cb, stem_model_dropdown],
             outputs=[instrumental_out, backup_vocals_out, main_vocals_out, main_vocals_dereverb_out,
                      drums_out, bass_out, guitar_out, piano_out, other_out]
         )
@@ -373,7 +383,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
 
     # === Tab 3: Stem Separator ===
     with gr.Tab("🥁 Stem Separator"):
-        gr.Markdown('Upload any instrumental audio file to split it into individual instrument stems using Meta HTDemucs.')
+        gr.Markdown('Upload any instrumental audio file to split it into individual instrument stems.')
 
         with gr.Row():
             stem_audio_in = gr.Audio(label="Upload Instrumental Audio", type="filepath")
@@ -383,7 +393,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
                 choices=list(INSTRUMENTAL_STEM_MODELS.keys()),
                 value=DEFAULT_STEM_MODEL,
                 label='Stem Separation Model',
-                info='HTDemucs 6-Stem separates guitar and piano. 4-Stem models are faster.'
+                info='6-Stem models separate guitar and piano. 4-Stem models are faster.'
             )
 
         with gr.Row():

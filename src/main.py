@@ -9,14 +9,11 @@ os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 # Multi-threaded OpenMP segfaults RVC inference on macOS (same as tools.py)
 os.environ["OMP_NUM_THREADS"] = "1"
 
-import subprocess
 import traceback
 from contextlib import suppress
 from urllib.parse import urlparse, parse_qs
 
 import gradio as gr
-import librosa
-import numpy as np
 import soundfile as sf
 import sox
 import torch
@@ -28,11 +25,10 @@ from pydub import AudioSegment
 from rvc import Config, load_hubert, get_vc, rvc_infer
 from separator_models import (
     DEFAULT_VOCAL_MODEL,
+    DEFAULT_INSTRUMENTAL_MODEL,
     DEFAULT_KARAOKE_MODEL,
     DEFAULT_DEREVERB_MODEL,
     DEFAULT_STEM_MODEL,
-    STEM_NAMES_6S,
-    STEM_NAMES_4S,
     separate_vocals_instrumental,
     separate_main_backup_vocals,
     apply_dereverb,
@@ -89,14 +85,16 @@ def yt_download(link, out_dir):
         'no_warnings': True,
         'quiet': True,
         'extractaudio': True,
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}],
+        # Decode to WAV. Re-encoding the stream to MP3 is a second lossy pass, and the
+        # separation models then have to work through its artifacts.
+        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'wav'}],
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         result = ydl.extract_info(link, download=True)
         # ignoreerrors makes yt_dlp return None instead of raising
         if result is None:
             raise Exception(f'Failed to download {link}.')
-        download_path = ydl.prepare_filename(result, outtmpl=os.path.join(out_dir, '%(title)s.mp3'))
+        download_path = ydl.prepare_filename(result, outtmpl=os.path.join(out_dir, '%(title)s.wav'))
 
     return download_path
 
@@ -180,19 +178,6 @@ def write_separation_manifest(song_dir, manifest):
         json.dump(manifest, f, indent=2)
 
 
-def convert_to_stereo(audio_path, out_dir):
-    wave, sr = librosa.load(audio_path, mono=False, sr=44100)
-
-    # check if mono
-    if type(wave[0]) != np.ndarray:
-        stereo_path = os.path.join(out_dir, f'{os.path.splitext(os.path.basename(audio_path))[0]}_stereo.wav')
-        command = ['ffmpeg', '-y', '-loglevel', 'error', '-i', audio_path, '-ac', '2', '-f', 'wav', stereo_path]
-        subprocess.run(command, check=True)
-        return stereo_path
-    else:
-        return audio_path
-
-
 def pitch_shift(audio_path, pitch_change):
     output_path = f'{os.path.splitext(audio_path)[0]}_p{pitch_change}.wav'
     if not os.path.exists(output_path):
@@ -232,7 +217,7 @@ def separate_stems(instrumentals_path, song_dir, stem_model, base_name):
 
 def preprocess_song(song_input, song_id, is_webui, input_type,
                     vocal_model=None, karaoke_model=None, dereverb_model=None,
-                    stem_model=None, progress=None):
+                    stem_model=None, instrumental_model=None, progress=None):
     song_output_dir = os.path.join(output_dir, song_id)
     if input_type == 'yt':
         display_progress('[~] Downloading song...', 0, is_webui, progress)
@@ -242,14 +227,12 @@ def preprocess_song(song_input, song_id, is_webui, input_type,
         orig_song_path = song_input
 
     base_name = os.path.splitext(os.path.basename(orig_song_path))[0]
-    stereo_song_path = convert_to_stereo(orig_song_path, song_output_dir)
 
     display_progress('[~] Separating Vocals from Instrumental...', 0.1, is_webui, progress)
     vocals_path, instrumentals_path = separate_vocals_instrumental(
-        stereo_song_path, song_output_dir, model_display_name=vocal_model, base_name=base_name
+        orig_song_path, song_output_dir, model_display_name=vocal_model, base_name=base_name,
+        instrumental_model_display_name=instrumental_model
     )
-    if stereo_song_path != orig_song_path:
-        os.remove(stereo_song_path)
 
     display_progress('[~] Separating Main Vocals from Backup Vocals...', 0.2, is_webui, progress)
     main_vocals_path, backup_vocals_path = separate_main_backup_vocals(
@@ -351,7 +334,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
                         reverb_rm_size=0.15, reverb_wet=0.2, reverb_dry=0.8, reverb_damping=0.7, output_format='mp3',
                         vocal_model=None, karaoke_model=None, dereverb_model=None,
                         stem_model=None, drums_gain=0, bass_gain=0, guitar_gain=0, piano_gain=0, other_inst_gain=0,
-                        progress=gr.Progress()):
+                        instrumental_model=None, progress=gr.Progress()):
     try:
         if not song_input or not voice_model:
             raise_exception('Ensure that the song input field and voice model field is filled.', is_webui)
@@ -383,6 +366,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         # Cached stems are only reusable if the same separation models produced them
         separation_models = {
             'vocal_model': vocal_model or DEFAULT_VOCAL_MODEL,
+            'instrumental_model': instrumental_model or DEFAULT_INSTRUMENTAL_MODEL,
             'karaoke_model': karaoke_model or DEFAULT_KARAOKE_MODEL,
             'dereverb_model': dereverb_model or DEFAULT_DEREVERB_MODEL,
         }
@@ -396,7 +380,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
             orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path, stem_paths = preprocess_song(
                 song_input, song_id, is_webui, input_type,
                 vocal_model=vocal_model, karaoke_model=karaoke_model, dereverb_model=dereverb_model,
-                stem_model=stem_model,
+                stem_model=stem_model, instrumental_model=instrumental_model,
                 progress=progress
             )
             write_separation_manifest(song_dir, {**separation_models, 'stem_model': stem_model})
@@ -495,8 +479,12 @@ if __name__ == '__main__':
     parser.add_argument('-rdry', '--reverb-dryness', type=float, default=0.8, help='Reverb dry level between 0 and 1')
     parser.add_argument('-rdamp', '--reverb-damping', type=float, default=0.7, help='Reverb damping between 0 and 1')
     parser.add_argument('-oformat', '--output-format', type=str, default='mp3', help='Output format of audio file. mp3 for smaller file size, wav for best quality')
+    parser.add_argument('--vocal-model', type=str, default=None, help=f'Model the vocals come from: a display name from the WebUI or a model filename. Default: {DEFAULT_VOCAL_MODEL}')
+    parser.add_argument('--instrumental-model', type=str, default=None, help=f'Model the instrumental comes from. Default: {DEFAULT_INSTRUMENTAL_MODEL}')
+    parser.add_argument('--karaoke-model', type=str, default=None, help=f'Model that splits main from backup vocals. Default: {DEFAULT_KARAOKE_MODEL}')
+    parser.add_argument('--dereverb-model', type=str, default=None, help=f'Model that removes reverb from the main vocals. Default: {DEFAULT_DEREVERB_MODEL}')
     parser.add_argument('--enable-stems', action='store_true', default=False, help='Enable instrumental stem separation into drums, bass, guitar, piano, and other')
-    parser.add_argument('--stem-model', type=str, default=None, help='Stem separation model display name. Default: HTDemucs 6-Stem (Best)')
+    parser.add_argument('--stem-model', type=str, default=None, help=f'Stem separation model display name. Default: {DEFAULT_STEM_MODEL}')
     parser.add_argument('--drums-vol', type=int, default=0, help='Volume change for drums stem in decibels')
     parser.add_argument('--bass-vol', type=int, default=0, help='Volume change for bass stem in decibels')
     parser.add_argument('--guitar-vol', type=int, default=0, help='Volume change for guitar stem in decibels')
@@ -521,6 +509,8 @@ if __name__ == '__main__':
                                      reverb_rm_size=args.reverb_size, reverb_wet=args.reverb_wetness,
                                      reverb_dry=args.reverb_dryness, reverb_damping=args.reverb_damping,
                                      output_format=args.output_format,
+                                     vocal_model=args.vocal_model, instrumental_model=args.instrumental_model,
+                                     karaoke_model=args.karaoke_model, dereverb_model=args.dereverb_model,
                                      stem_model=stem_model_arg,
                                      drums_gain=args.drums_vol, bass_gain=args.bass_vol,
                                      guitar_gain=args.guitar_vol, piano_gain=args.piano_vol,

@@ -9,11 +9,13 @@ import gradio as gr
 
 from main import song_cover_pipeline
 from separator_models import (
-    VOCAL_INSTRUMENTAL_MODELS,
+    VOCAL_MODELS,
+    INSTRUMENTAL_MODELS,
     KARAOKE_MODELS,
     DEREVERB_MODELS,
     INSTRUMENTAL_STEM_MODELS,
     DEFAULT_VOCAL_MODEL,
+    DEFAULT_INSTRUMENTAL_MODEL,
     DEFAULT_KARAOKE_MODEL,
     DEFAULT_DEREVERB_MODEL,
     DEFAULT_STEM_MODEL,
@@ -221,11 +223,18 @@ if __name__ == '__main__':
                             'Models are auto-downloaded on first use to the `separation_models/` folder.')
                 with gr.Row():
                     vocal_sep_model = gr.Dropdown(
-                        choices=list(VOCAL_INSTRUMENTAL_MODELS.keys()),
+                        choices=list(VOCAL_MODELS.keys()),
                         value=DEFAULT_VOCAL_MODEL,
-                        label='Vocal / Instrumental Model',
-                        info='Separates vocals from instrumentals. BS-Roformer is state-of-the-art.'
+                        label='Vocal Model',
+                        info='The vocals come from this model. An ensemble runs several models and combines them.'
                     )
+                    instrumental_sep_model = gr.Dropdown(
+                        choices=list(INSTRUMENTAL_MODELS.keys()),
+                        value=DEFAULT_INSTRUMENTAL_MODEL,
+                        label='Instrumental Model',
+                        info='The instrumental comes from this model.'
+                    )
+                with gr.Row():
                     karaoke_sep_model = gr.Dropdown(
                         choices=list(KARAOKE_MODELS.keys()),
                         value=DEFAULT_KARAOKE_MODEL,
@@ -250,7 +259,7 @@ if __name__ == '__main__':
                         choices=list(INSTRUMENTAL_STEM_MODELS.keys()),
                         value=DEFAULT_STEM_MODEL,
                         label='Stem Separation Model',
-                        info='HTDemucs 6-Stem separates guitar and piano. 4-Stem models are faster.',
+                        info='6-Stem models separate guitar and piano. 4-Stem models are faster.',
                         visible=False,
                     )
 
@@ -313,15 +322,16 @@ if __name__ == '__main__':
                                         inst_gain, index_rate, filter_radius, rms_mix_rate, f0_method, crepe_hop_length,
                                         protect, pitch_all, reverb_rm_size, reverb_wet, reverb_dry, reverb_damping,
                                         output_format, vocal_sep_model, karaoke_sep_model, dereverb_sep_model,
-                                        stem_model_state, drums_gain, bass_gain, guitar_gain, piano_gain, other_inst_gain],
+                                        stem_model_state, drums_gain, bass_gain, guitar_gain, piano_gain, other_inst_gain,
+                                        instrumental_sep_model],
                                outputs=[ai_cover])
             clear_btn.click(lambda: [0, 0, 0, 0, 0.5, 3, 0.25, 0.33, 'rmvpe', 128, 0, 0.15, 0.2, 0.8, 0.7, 'mp3',
-                                     DEFAULT_VOCAL_MODEL, DEFAULT_KARAOKE_MODEL, DEFAULT_DEREVERB_MODEL,
+                                     DEFAULT_VOCAL_MODEL, DEFAULT_INSTRUMENTAL_MODEL, DEFAULT_KARAOKE_MODEL, DEFAULT_DEREVERB_MODEL,
                                      False, DEFAULT_STEM_MODEL, 0, 0, 0, 0, 0, None, None],
                             outputs=[pitch, main_gain, backup_gain, inst_gain, index_rate, filter_radius, rms_mix_rate,
                                      protect, f0_method, crepe_hop_length, pitch_all, reverb_rm_size, reverb_wet,
                                      reverb_dry, reverb_damping, output_format,
-                                     vocal_sep_model, karaoke_sep_model, dereverb_sep_model,
+                                     vocal_sep_model, instrumental_sep_model, karaoke_sep_model, dereverb_sep_model,
                                      enable_stems, stem_sep_model, drums_gain, bass_gain, guitar_gain, piano_gain,
                                      other_inst_gain, stem_model_state, ai_cover])
 

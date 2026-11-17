@@ -104,7 +104,7 @@ Upload a song and click **Split Audio**. You get four outputs:
 - **Main Vocals**
 - **Main Vocals (De-Reverbed)**
 
-Under **Separation Model Selection**, you can pick the model for each step: vocal/instrumental, main/backup vocals and de-reverb. Set the de-reverb model to "None (Skip)" to skip that step.
+Under **Separation Model Selection**, you can pick the model for each step: vocals, instrumental, main/backup vocals and de-reverb. Set the de-reverb model to "None (Skip)" to skip that step. See [Separation models](#separation-models) for how to choose.
 
 Open **Instrumental Stem Separation** and tick **Enable Instrumental Stem Separation** to also split the instrumental into drums, bass, guitar, piano and other. This adds a lot of processing time.
 
@@ -142,12 +142,21 @@ Models are downloaded automatically into `separation_models/` the first time you
 
 | Step | Models |
 |------|--------|
-| Vocals / Instrumental | **BS-Roformer (Best Quality)**, MDX23C HQ v2, MDX23C HQ, UVR-MDX-NET Voc FT (Legacy) |
+| Vocals | **Ensemble: BS-Roformer + Mel-Roformer Big Beta 6X (Best, 2 models)**, BS-Roformer (Very Good), Mel-Roformer Big Beta 6X (Very Good), Ensemble: Cleanest Instrumental (2 models), MDX23C HQ v2 (Good), MDX23C HQ (Good), UVR-MDX-NET Voc FT (Legacy) |
+| Instrumental | **Mix minus vocals (Cleanest)**, Ensemble: BS-Roformer + Resurrection Inst (Fuller), BS-Roformer Resurrection Inst (Fullest, most vocal bleed) |
 | Main / Backup vocals | **Mel-Roformer Karaoke (Best)**, UVR MDX Karaoke 2 (Legacy) |
-| De-Reverb | **UVR DeEcho-DeReverb (Best)**, Reverb HQ By FoxJoy (Legacy), None (Skip) |
-| Instrumental stems | **HTDemucs 6-Stem (Best)**, BS-Roformer SW 6-Stem (Best Guitar), HTDemucs Fine-Tuned 4-Stem, HTDemucs Standard 4-Stem (Fast) |
+| De-Reverb | **Mel-Roformer De-Reverb (Best)**, Mel-Roformer De-Reverb (Less Aggressive), UVR DeEcho-DeReverb, Reverb HQ By FoxJoy (Legacy), None (Skip) |
+| Instrumental stems | **BS-Roformer SW 6-Stem (Best)**, HTDemucs 6-Stem, HTDemucs Fine-Tuned 4-Stem, HTDemucs Standard 4-Stem (Fast) |
 
-6-stem models output drums, bass, guitar, piano and other. 4-stem models output drums, bass and other; guitar and piano end up in "other". BS-Roformer SW gives the cleanest guitar stem.
+**Vocals.** An ensemble runs two models on the song and combines their vocals, so it takes about twice as long as one model. The default averages the two, which gives slightly better vocals and a slightly better instrumental than either model alone. **Cleanest Instrumental** instead takes everything either model calls vocals. That leaves the least vocal in the instrumental, and the vocals pick up a little more of the instruments.
+
+**Instrumental.** By default the instrumental is the mix minus the vocals, which leaves the least vocal in it. The Resurrection Inst options use a model that predicts the instrumental directly. It keeps more of the instruments and lets more of the vocal through.
+
+**Stems.** 6-stem models output drums, bass, guitar, piano and other. 4-stem models output drums, bass and other; guitar and piano end up in "other".
+
+With `audio-separator` 0.40 or newer, all stems are written as 24-bit WAV. Older versions write 16-bit.
+
+The newer models need a recent `audio-separator`: 0.32 for Mel-Roformer Big Beta 6X, 0.36 for Resurrection Inst and 0.38 for BS-Roformer SW. Models your installed version doesn't ship are left out of the lists, and the next entry becomes the default.
 
 ## AI cover generation WebUI
 
@@ -189,7 +198,7 @@ python src/main.py -i SONG_INPUT -dir RVC_DIRNAME -p PITCH_CHANGE [options]
 Example with stems:
 
 ```bash
-python src/main.py -i "https://www.youtube.com/watch?v=XXXXXXXXXXX" -dir John -p 0 --enable-stems --stem-model "BS-Roformer SW 6-Stem (Best Guitar)" --guitar-vol 3
+python src/main.py -i "https://www.youtube.com/watch?v=XXXXXXXXXXX" -dir John -p 0 --enable-stems --stem-model "HTDemucs 6-Stem" --guitar-vol 3
 ```
 
 | Flag | Description |
@@ -213,11 +222,10 @@ python src/main.py -i "https://www.youtube.com/watch?v=XXXXXXXXXXX" -dir John -p
 | `-rdry`, `--reverb-dryness` | Default `0.8`. Reverb dry level (0–1). |
 | `-rdamp`, `--reverb-damping` | Default `0.7`. High-frequency absorption of the reverb (0–1). |
 | `-oformat`, `--output-format` | Default `mp3`. `mp3` or `wav`. |
+| `--vocal-model`, `--instrumental-model`, `--karaoke-model`, `--dereverb-model` | Model for each separation step: a display name from [Separation models](#separation-models) or a model filename. Default: the first entry of each list. |
 | `--enable-stems` | Split the instrumental into stems and mix them individually. |
-| `--stem-model` | Stem model display name. Default `HTDemucs 6-Stem (Best)`. |
+| `--stem-model` | Stem model display name. Default `BS-Roformer SW 6-Stem (Best)`. |
 | `--drums-vol`, `--bass-vol`, `--guitar-vol`, `--piano-vol`, `--other-inst-vol` | Default `0`. Per-stem volume change in dB (with `--enable-stems`). |
-
-The CLI always uses the default vocal, karaoke and de-reverb models.
 
 ## Output files and caching
 
