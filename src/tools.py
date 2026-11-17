@@ -256,7 +256,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
         with gr.Accordion("Instrumental Stem Separation", open=False):
             gr.Markdown(
                 'Optionally split the instrumental into individual stems: drums, bass, guitar, piano, and other. '
-                'Uses Meta\'s HTDemucs model. Adds significant processing time.'
+                'Uses Meta\'s HTDemucs or BS-Roformer SW. Adds significant processing time.'
             )
             with gr.Row():
                 enable_stems_cb = gr.Checkbox(
@@ -268,7 +268,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
                     choices=list(INSTRUMENTAL_STEM_MODELS.keys()),
                     value=DEFAULT_STEM_MODEL,
                     label='Stem Separation Model',
-                    info='HTDemucs 6-Stem separates guitar and piano. 4-Stem models are faster.',
+                    info='6-Stem models separate guitar and piano, and BS-Roformer SW has the cleanest guitar. 4-Stem models are faster.',
                     visible=False,
                 )
 
@@ -373,7 +373,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
 
     # === Tab 3: Stem Separator ===
     with gr.Tab("🥁 Stem Separator"):
-        gr.Markdown('Upload any instrumental audio file to split it into individual instrument stems using Meta HTDemucs.')
+        gr.Markdown('Upload any instrumental audio file to split it into individual instrument stems using Meta HTDemucs or BS-Roformer SW.')
 
         with gr.Row():
             stem_audio_in = gr.Audio(label="Upload Instrumental Audio", type="filepath")
@@ -383,7 +383,7 @@ with gr.Blocks(title='AI Audio Tools') as app:
                 choices=list(INSTRUMENTAL_STEM_MODELS.keys()),
                 value=DEFAULT_STEM_MODEL,
                 label='Stem Separation Model',
-                info='HTDemucs 6-Stem separates guitar and piano. 4-Stem models are faster.'
+                info='6-Stem models separate guitar and piano, and BS-Roformer SW has the cleanest guitar. 4-Stem models are faster.'
             )
 
         with gr.Row():

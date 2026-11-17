@@ -40,6 +40,7 @@ DEREVERB_MODELS = {
 
 INSTRUMENTAL_STEM_MODELS = {
     "HTDemucs 6-Stem (Best)": "htdemucs_6s.yaml",
+    "BS-Roformer SW 6-Stem (Best Guitar)": "BS-Roformer-SW.ckpt",
     "HTDemucs Fine-Tuned 4-Stem": "htdemucs_ft.yaml",
     "HTDemucs Standard 4-Stem (Fast)": "htdemucs.yaml",
 }
@@ -233,8 +234,8 @@ def separate_instrumental_stems(instrumental_path, output_dir, model_display_nam
     """
     Separate an instrumental track into individual instrument stems.
 
-    Uses Demucs models via audio-separator to split the instrumental into
-    drums, bass, guitar, piano, other, and vocal remnants, written as
+    Uses Demucs or BS-Roformer models via audio-separator to split the instrumental
+    into drums, bass, guitar, piano, other, and vocal remnants, written as
     <base>_Stem_<Name>.wav and <base>_Stem_Vocal_Remnants.wav.
 
     Args:

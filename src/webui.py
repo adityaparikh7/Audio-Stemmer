@@ -250,7 +250,7 @@ if __name__ == '__main__':
                         choices=list(INSTRUMENTAL_STEM_MODELS.keys()),
                         value=DEFAULT_STEM_MODEL,
                         label='Stem Separation Model',
-                        info='HTDemucs 6-Stem separates guitar and piano. 4-Stem models are faster.',
+                        info='6-Stem models separate guitar and piano, and BS-Roformer SW has the cleanest guitar. 4-Stem models are faster.',
                         visible=False,
                     )
 
